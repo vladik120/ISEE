@@ -1,6 +1,8 @@
 package com.example.isee;
 
 
+import static android.opengl.GLSurfaceView.RENDERMODE_WHEN_DIRTY;
+
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -160,15 +162,23 @@ public class ObjectDetectionForCamera extends AppCompatActivity implements Sampl
     private Long start = 0l;
     public static Context context;
     public static boolean hasFrame = false;
+    public static boolean sadHasSurface = false;
 
     public void CheckForObstacle(ArrayList<Result> AResult, float threshold){
-        int count = 0;
+        Log.i("ObjectDetectionForCamera", "CheckForObstacle : start obstacle detection check");
+
         for(Result result : AResult)
-            if(result.distance < threshold) count++;
-        if(count > 0) {
-            TextToSpeechConvert.speak("Warning, obstacle ahead!");
-            sleepFor(2000);
-        }
+            if(result.distance < threshold) {
+                Log.i("ObjectDetectionForCamera", "CheckForObstacle : start speaking");
+                TextToSpeechConvert.speak("Warning, obstacle ahead!");
+                sleepFor(3500);
+                Log.i("ObjectDetectionForCamera", "CheckForObstacle : detected an obstacle");
+                break;
+            }
+        Log.i("ObjectDetectionForCamera", "CheckForObstacle : finished obstacle detection check");
+
+        ObjectDetectionForCamera.hasFrame = false;
+        surfaceView.requestRender();
     }
 
     private static void sleepFor(long millisecond) {
@@ -192,6 +202,8 @@ public class ObjectDetectionForCamera extends AppCompatActivity implements Sampl
         runObjectDetectionForCameraReceiver();
         context = this.getApplicationContext();
         setArcore();
+
+        surfaceView.requestRender();
     }
 
     private Bitmap imgToBitmap(Image image) {
@@ -242,7 +254,7 @@ public class ObjectDetectionForCamera extends AppCompatActivity implements Sampl
 
         Matrix matrix = new Matrix();
         matrix.postRotate(90.0f);
-        bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+        bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(),bitmap.getHeight(), matrix, true);
         Bitmap resizedBitmap = Bitmap.createScaledBitmap(bitmap, PrePostProcessor.mInputWidth, PrePostProcessor.mInputHeight, true);
 
         final Tensor inputTensor = TensorImageUtils.bitmapToFloat32Tensor(resizedBitmap, PrePostProcessor.NO_MEAN_RGB, PrePostProcessor.NO_STD_RGB);
@@ -267,6 +279,9 @@ public class ObjectDetectionForCamera extends AppCompatActivity implements Sampl
         // Set up renderer.
         render = new SampleRender(surfaceView, this, getAssets());
         installRequested = false;
+
+        surfaceView.setRenderMode(RENDERMODE_WHEN_DIRTY);
+
     }
 
 
@@ -567,7 +582,7 @@ public class ObjectDetectionForCamera extends AppCompatActivity implements Sampl
                 message = TrackingStateHelper.getTrackingFailureReasonString(camera);
             }
         } else if (hasTrackingPlane()) {
-            message = "has surface";
+            message = "has surface.";
         } else {
             message = SEARCHING_PLANE_MESSAGE;
         }
@@ -578,7 +593,8 @@ public class ObjectDetectionForCamera extends AppCompatActivity implements Sampl
             messageSnackbarHelper.showMessage(this, message);
         }
 
-        if (!message.contains("has surface")){
+        if (!message.contains("has surface.")){
+            sadHasSurface = false;
             if ((System.currentTimeMillis() - start)/1000 >= 10){
                 if(message != null) {
                     TextToSpeechConvert.speak(message);
@@ -588,38 +604,16 @@ public class ObjectDetectionForCamera extends AppCompatActivity implements Sampl
             }
         }
 
-        Thread thread = new Thread(){
-            @Override
-            public void run() {
-                AnalysisResult Aresult = analyzeImage(frame);
-
-                if(Aresult == null || Aresult.getArrayList() == null){
-                    Log.e("objectDetection","result = null");
-                }else{
-                    ArrayList<Result> fresult = Aresult.getArrayList();
-                    CheckForObstacle(fresult,1.5f);
-                }
-                ObjectDetectionForCamera.hasFrame = false;
-                Log.i("ObjectDetectionForCamera","onDrawFrame : finished with yolo");
-            }
-        };
-
-        if (!hasFrame && message == "has surface"){
-            ObjectDetectionForCamera.hasFrame = true;
-            try {
-                if(thread.isAlive()){
-                    thread.join();
-                }else{
-                    thread.run();
-                }
-                sleepFor(1000);
-            }catch (InterruptedException  e){
-                e.printStackTrace();
-                return;
+        if (message.contains("has surface.")) {
+            if(sadHasSurface == false){
+                sadHasSurface = true;
+                TextToSpeechConvert.speak(message);
+                sleepFor(2000);
             }
 
         }
-        Log.i("ObjectDetectionForCamera","onDrawFrame : number of threads is " + Thread.activeCount());
+
+
 
         camera.getViewMatrix(viewMatrix, 0);
 
@@ -637,6 +631,37 @@ public class ObjectDetectionForCamera extends AppCompatActivity implements Sampl
         // Visualize anchors created by touch.
 
         render.clear(virtualSceneFramebuffer, 0f, 0f, 0f, 0f);
+
+        if (!hasFrame && message == "has surface."){
+            ObjectDetectionForCamera.hasFrame = true;
+            Log.i("ObjectDetectionForCamera", "onDrawFrame : start obstacle detection check");
+
+            Frame FrameForAnalyze = null;
+
+            try{
+                FrameForAnalyze = session.update();
+            }catch(Exception e){
+                e.printStackTrace();
+            }
+
+            if(FrameForAnalyze != null){
+                AnalysisResult Aresult = analyzeImage(FrameForAnalyze);
+
+                if (Aresult == null || Aresult.getArrayList() == null) {
+                    Log.i("ObjectDetectionForCamera", "onDrawFrame : result = null");
+                    ObjectDetectionForCamera.hasFrame = false;
+                    surfaceView.requestRender();
+                } else {
+                    ArrayList<Result> fresult = Aresult.getArrayList();
+                    CheckForObstacle(fresult, 2.0f);
+                }
+
+                sleepFor(1000);
+            } else {
+                ObjectDetectionForCamera.hasFrame = false;
+                surfaceView.requestRender();
+            }
+        } else surfaceView.requestRender();
     }
 
     /** Checks if we detected at least one plane. */

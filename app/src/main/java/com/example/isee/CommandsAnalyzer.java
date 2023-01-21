@@ -68,7 +68,7 @@ public class CommandsAnalyzer {
                 toMainAndSpeak("this command does not exist");
             }
         }else {
-            if(text.contains("stop obstacles detection") || text.contains("stop obstacle detection")) {
+            if(text.contains("stop obstacles detection") || text.contains("stop obstacle detection") || text.contains("stop")) {
                 toObjectDetectionForCamera("stopping obstacle detection");
                 identifyObstacles = false;
             }else {
@@ -81,6 +81,7 @@ public class CommandsAnalyzer {
 
         if(text.contains("stop I see") || text.contains("stop IC") || text.contains("quit") || text.contains("exit")) {
             toMainAndSpeak("stopping app");
+            sleepFor(1000);
             sendToMainActivity("stopIsee");
             return;
         }
@@ -115,6 +116,12 @@ public class CommandsAnalyzer {
         ObjectDetectionForCamera.context.sendBroadcast(intent);
     }
 
+    private static void sleepFor(long millisecond) {
+        try{
+            Thread.sleep(millisecond);
+        }
+        catch(Exception e){}
+    }
 
 
 }

@@ -6,7 +6,10 @@
 
 package com.example.isee;
 
+import static android.view.MotionEvent.ACTION_DOWN;
+
 import android.graphics.Rect;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.MotionEvent;
 
@@ -185,8 +188,9 @@ public class PrePostProcessor {
                 Rect rect = new Rect((int)(startX+ivScaleX*left), (int)(startY+top*ivScaleY), (int)(startX+ivScaleX*right), (int)(startY+ivScaleY*bottom));
                 float distance = 100.0F;
                 MotionEvent tap =
-                        MotionEvent.obtain(5660148631l,5660148664l,1, (float) ((left + (right - left)/2.0)*ivScaleX), (float) ((top + (bottom - top)/2.0)*ivScaleY),0);
+                        MotionEvent.obtain(SystemClock.uptimeMillis(),SystemClock.uptimeMillis(),2, (float) ((left + (right - left)/2.0)*ivScaleX), (float) ((top + (bottom - top)/2.0)*ivScaleY),0);
                 List<HitResult> hitResultList = frame.hitTest(tap);
+
                 if(hitResultList.isEmpty()){
                     Log.e("Set distance","hitResultList.isEmpty()");
                     return null;
